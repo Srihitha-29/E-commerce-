@@ -39,11 +39,24 @@ if (isset($_POST['increase_quantity'])) {
     exit();
 }
 
-// Decrease Quantity
+// Decrease Quantity or Remove if 1
 if (isset($_POST['decrease_quantity'])) {
     $product_id = intval($_POST['product_id']);
-    $stmt = $conn->prepare("UPDATE cart SET quantity = GREATEST(quantity - 1, 1) WHERE user_id = ? AND product_id = ?");
+
+    $stmt = $conn->prepare("SELECT quantity FROM cart WHERE user_id = ? AND product_id = ?");
     $stmt->execute([$user_id, $product_id]);
+    $cart_item = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($cart_item) {
+        if ($cart_item['quantity'] > 1) {
+            $stmt = $conn->prepare("UPDATE cart SET quantity = quantity - 1 WHERE user_id = ? AND product_id = ?");
+            $stmt->execute([$user_id, $product_id]);
+        } else {
+            $stmt = $conn->prepare("DELETE FROM cart WHERE user_id = ? AND product_id = ?");
+            $stmt->execute([$user_id, $product_id]);
+        }
+    }
+
     header("Location: cart.php");
     exit();
 }
@@ -76,6 +89,8 @@ $total_cost = 0;
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Your Cart</title>
+<!-- Font Awesome for bin icon -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-pVU6yZ6x..." crossorigin="anonymous" referrerpolicy="no-referrer" />
 <style>
 body {
     font-family: 'Arial', sans-serif;
@@ -131,18 +146,17 @@ h2 {
     gap: 5px;
 }
 .item-actions form button {
-    background-color: #007bff;
-    color: white;
+    background: none;
     border: none;
-    padding: 6px 12px;
-    border-radius: 5px;
+    padding: 6px;
     cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-    line-height: 1;
 }
-.item-actions form button:hover {
-    background-color: #0056b3;
+.item-actions form button:hover i {
+    transform: scale(1.1);
+}
+.item-actions form button i {
+    font-size: 18px;
+    color: #dc3545;
 }
 .quantity-display {
     width: 40px;
@@ -220,7 +234,9 @@ if ($cart_is_empty) {
                 </form>
                 <form method='POST'>
                     <input type='hidden' name='product_id' value='{$product['id']}'>
-                    <button type='submit' name='remove_from_cart'>Remove</button>
+                    <button type='submit' name='remove_from_cart' title='Remove'>
+                        <i class='fas fa-trash'></i>
+                    </button>
                 </form>
             </div>
         </div>";
