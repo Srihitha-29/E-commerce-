@@ -15,7 +15,6 @@ if (isset($_POST['add_to_cart'])) {
     $product_id = intval($_POST['product_id']);
     $quantity = 1;
 
-    // Check if product already in cart
     $stmt = $conn->prepare("SELECT * FROM cart WHERE user_id = ? AND product_id = ?");
     $stmt->execute([$user_id, $product_id]);
     $cart_item = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -63,9 +62,10 @@ $stmt = $conn->prepare("SELECT * FROM cart WHERE user_id = ?");
 $stmt->execute([$user_id]);
 $cart_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// ===== Minimal Fix for empty cart =====
+$cart_is_empty = false;
 if (empty($cart_items)) {
-    header("Location: ../index.php"); // redirect if cart is empty
-    exit();
+    $cart_is_empty = true;
 }
 
 $total_cost = 0;
@@ -183,58 +183,56 @@ h2 {
 <h2>Your Cart</h2>
 
 <?php
-$product_ids = array_column($cart_items, 'product_id');
-$placeholders = implode(',', array_fill(0, count($product_ids), '?'));
-$stmt = $conn->prepare("SELECT * FROM products WHERE id IN ($placeholders)");
-$stmt->execute($product_ids);
-$products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+if ($cart_is_empty) {
+    echo "<p>Your cart is empty. <a href='../index.php'>Go back to shop</a></p>";
+} else {
+    $product_ids = array_column($cart_items, 'product_id');
+    $placeholders = implode(',', array_fill(0, count($product_ids), '?'));
+    $stmt = $conn->prepare("SELECT * FROM products WHERE id IN ($placeholders)");
+    $stmt->execute($product_ids);
+    $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-foreach ($products as $product) {
-    $quantity = 0;
-    foreach ($cart_items as $cart_item) {
-        if ($cart_item['product_id'] == $product['id']) {
-            $quantity = $cart_item['quantity'];
-            break;
+    foreach ($products as $product) {
+        $quantity = 0;
+        foreach ($cart_items as $cart_item) {
+            if ($cart_item['product_id'] == $product['id']) {
+                $quantity = $cart_item['quantity'];
+                break;
+            }
         }
-    }
-    $total_cost += $product['price'] * $quantity;
+        $total_cost += $product['price'] * $quantity;
 
-    echo "<div class='cart-item'>
-        <img src='../images/{$product['image']}' alt='{$product['name']}'>
-        <div class='item-details'>
-            <div class='item-name'>{$product['name']}</div>
-            <div class='item-price'>₹" . number_format($product['price'], 2) . " x $quantity</div>
-        </div>
-        <div class='item-actions'>
-            <!-- Decrease -->
-            <form method='POST'>
-                <input type='hidden' name='product_id' value='{$product['id']}'>
-                <button type='submit' name='decrease_quantity'>−</button>
-            </form>
-            <!-- Quantity Display -->
-            <input type='text' class='quantity-display' value='$quantity' readonly>
-            <!-- Increase -->
-            <form method='POST'>
-                <input type='hidden' name='product_id' value='{$product['id']}'>
-                <button type='submit' name='increase_quantity'>+</button>
-            </form>
-            <!-- Remove -->
-            <form method='POST'>
-                <input type='hidden' name='product_id' value='{$product['id']}'>
-                <button type='submit' name='remove_from_cart'>Remove</button>
-            </form>
-        </div>
-    </div>";
+        echo "<div class='cart-item'>
+            <img src='../images/{$product['image']}' alt='{$product['name']}'>
+            <div class='item-details'>
+                <div class='item-name'>{$product['name']}</div>
+                <div class='item-price'>₹" . number_format($product['price'], 2) . " x $quantity</div>
+            </div>
+            <div class='item-actions'>
+                <form method='POST'>
+                    <input type='hidden' name='product_id' value='{$product['id']}'>
+                    <button type='submit' name='decrease_quantity'>−</button>
+                </form>
+                <input type='text' class='quantity-display' value='$quantity' readonly>
+                <form method='POST'>
+                    <input type='hidden' name='product_id' value='{$product['id']}'>
+                    <button type='submit' name='increase_quantity'>+</button>
+                </form>
+                <form method='POST'>
+                    <input type='hidden' name='product_id' value='{$product['id']}'>
+                    <button type='submit' name='remove_from_cart'>Remove</button>
+                </form>
+            </div>
+        </div>";
+    }
+
+    echo "<div class='total-cost'>Total: ₹" . number_format($total_cost, 2) . "</div>";
+    echo "<div class='cart-actions'>
+            <a href='../index.php'>Back to Shop</a>
+            <a href='checkout.php'>Proceed to Checkout</a>
+          </div>";
 }
 ?>
-
-<div class="total-cost">
-    Total: ₹<?= number_format($total_cost, 2); ?>
-</div>
-<div class="cart-actions">
-    <a href="../index.php">Back to Shop</a>
-    <a href="checkout.php">Proceed to Checkout</a>
-</div>
 
 </div>
 </body>
